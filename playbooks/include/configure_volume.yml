@@ -55,7 +55,7 @@
     recurse: True
 
 - name: Mount the new filesystem now and create a fstab entry so it will be mounted on boot
-  ansible.posix.mount:
+  mount:
     path: "{{ volume.mount_point }}"
     src: UUID={{ filesystem_uuid }}
     state: mounted
