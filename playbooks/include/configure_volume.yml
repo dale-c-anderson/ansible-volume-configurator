@@ -4,7 +4,7 @@
     that: volume.device not in ["/dev/xvda", "/dev/nvme0n1", "/dev/sda"]
 
 - name: Format the filesystem
-  community.general.filesystem:
+  filesystem:
     dev: "{{ volume.device }}"
     fstype: "{{ volume.fstype}}"
     resizefs: yes
