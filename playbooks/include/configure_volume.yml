@@ -1,0 +1,75 @@
+---
+- name: Stat the device
+  ansible.builtin.stat:
+      path: "{{ volume.device }}"
+  register: device_stat_result
+
+- name: Debug device_stat_result
+  debug:
+    var: device_stat_result
+
+- name: Make Sure we are not about to mess with root volume
+  assert:
+    that:
+      - volume.device not in ["/dev/xvda", "/dev/nvme0n1", "/dev/sda"]
+
+- name: Make Sure the specified device exists
+  assert:
+    that:
+      - device_stat_result.stat.exists
+
+- name: Format the filesystem. Note that since this is a secondary volume, we don't actually need to create a partition first.
+  filesystem:
+    dev: "{{ volume.device }}"
+    fstype: "{{ volume.fstype}}"
+    resizefs: yes
+    force: no  # Don't re-format if the filesystem already exists.
+
+- name: define uuid_cmd
+  set_fact:
+    uuid_cmd: "/sbin/blkid {{ volume.device }} --output value --match-tag UUID"
+
+- name: debug uuid_cmd
+  ansible.builtin.debug:
+      var: uuid_cmd
+
+- name: Get UUID of the filesystem
+  ansible.builtin.command: "{{ uuid_cmd }}"
+  register: uuid_result
+  changed_when: False  # This command isn't changing anything, so don't ever report it as changed
+
+- name: debug uuid_result
+  ansible.builtin.debug:
+    var: uuid_result
+
+- set_fact:
+    filesystem_uuid: "{{ uuid_result.stdout_lines[0]|trim() }}"
+
+- debug:
+    var: filesystem_uuid
+
+- assert:
+    that:
+      - (filesystem_uuid | length) == 36
+
+- name: Check if the mount point exists
+  ansible.builtin.stat:
+    path: "{{ volume.mount_point }}"
+  register: mount_point_stat_result
+
+- name: Create the mount point if it doesn't exist
+  file:
+    path: "{{ volume.mount_point }}"
+    state: directory
+    mode: 0755
+    recurse: True
+  when: not mount_point_stat_result.stat.exists
+
+- name: Mount the new filesystem now and create a fstab entry so it will be mounted on boot
+  mount:
+    path: "{{ volume.mount_point }}"
+    src: UUID={{ filesystem_uuid }}
+    state: mounted
+    fstype: "{{ volume.fstype }}"
+    opts: defaults,nofail
+    dump: 0
