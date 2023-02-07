@@ -1,17 +1,25 @@
 ---
-    - name: Get UUID of device
-      ansible.builtin.command: lsblk {{ volume.device }} -no UUID
-      register: uuid_result
+- name: define command
+  set_fact:
+    uuid_cmd: "lsblk {{ volume.device }} -no UUID"
 
-    - name: debug uuid_result
-      ansible.builtin.debug:
-        var: uuid_result
+- name: debug uuid_cmd
+  ansible.builtin.debug:
+      var: uuid_cmd
 
-    - set_fact:
-        uuid: "{{ uuid_result.stdout_lines[0]|trim() }}"
+- name: Get UUID of device
+  ansible.builtin.command: "{{ uuid_cmd }}"
+  register: uuid_result
 
-    - debug:
-        var: uuid
+- name: debug uuid_result
+  ansible.builtin.debug:
+    var: uuid_result
+
+- set_fact:
+    uuid: "{{ uuid_result.stdout_lines[0]|trim() }}"
+
+- debug:
+    var: uuid
 
 #    - name: Mount new volumes and create fstab entries
 #      ansible.posix.mount:
