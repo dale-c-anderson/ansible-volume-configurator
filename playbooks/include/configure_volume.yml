@@ -3,6 +3,10 @@
       ansible.builtin.command: lsblk {{ volume.device }} -no UUID
       register: uuid_result
 
+    - name: debug uuid_result
+      ansible.builtin.debug:
+        var: uuid_result
+
     - set_fact:
         uuid: "{{ uuid_result.stdout_lines[0]|trim() }}"
 
