@@ -4,6 +4,10 @@
       path: "{{ volume.device }}"
   register: device_stat_result
 
+- name: Debug device_stat_result
+  debug:
+    var: device_stat_result
+
 - name: Make Sure we are not about to mess with root volume
   assert:
     that:
