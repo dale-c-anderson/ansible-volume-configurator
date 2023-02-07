@@ -49,7 +49,7 @@
 
 - assert:
     that:
-      - len(filesystem_uuid) == 36
+      - (filesystem_uuid | length) == 36
 
 - name: Make sure a mount point exists for the new filesystem
   file:
