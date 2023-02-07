@@ -10,9 +10,9 @@
     resizefs: yes
     force: no  # Prevent accidents.
 
-- name: define uuid command
+- name: define uuid_cmd
   set_fact:
-    uuid_cmd: "lsblk {{ volume.device }} -no UUID"
+    uuid_cmd: "/sbin/blkid {{ volume.device }} --output value --match-tag UUID"
 
 - name: debug uuid_cmd
   ansible.builtin.debug:
