@@ -1,14 +1,25 @@
 ---
+- name: Stat the device
+  ansible.builtin.stat:
+      path: "{{ volume.device }}"
+  register: device_stat_result
+
 - name: Make Sure we are not about to mess with root volume
   assert:
-    that: volume.device not in ["/dev/xvda", "/dev/nvme0n1", "/dev/sda"]
+    that:
+      - volume.device not in ["/dev/xvda", "/dev/nvme0n1", "/dev/sda"]
 
-- name: Format the filesystem
+- name: Make Sure the specified device exists
+  command:
+    that:
+      - device_stat_result.stat.exists
+
+- name: Format the filesystem. Note that since this is a secondary volume, we don't actually need to create a partition first.
   filesystem:
     dev: "{{ volume.device }}"
     fstype: "{{ volume.fstype}}"
     resizefs: yes
-    force: no  # Prevent accidents.
+    force: no  # Don't re-format if the filesystem already exists.
 
 - name: define uuid_cmd
   set_fact:
@@ -18,7 +29,7 @@
   ansible.builtin.debug:
       var: uuid_cmd
 
-- name: Get UUID of device
+- name: Get UUID of the filesystem
   ansible.builtin.command: "{{ uuid_cmd }}"
   register: uuid_result
 
@@ -27,16 +38,27 @@
     var: uuid_result
 
 - set_fact:
-    uuid: "{{ uuid_result.stdout_lines[0]|trim() }}"
+    filesystem_uuid: "{{ uuid_result.stdout_lines[0]|trim() }}"
 
 - debug:
-    var: uuid
+    var: filesystem_uuid
 
-#    - name: Mount new volumes and create fstab entries
-#      ansible.posix.mount:
-#        path: "{{ item.item.mount }}"
-#        src: UUID={{ item.stdout_lines[0] }}
-#        state: mounted
-#        fstype: xfs
-#        opts: defaults,nofail
-#      loop: "{{ uuid.results }}"
+- assert:
+    that:
+      - len(filesystem_uuid) == 36
+
+- name: Make sure a mount point exists for the new filesystem
+  file:
+    path: "{{ volume.mount_point }}"
+    state: directory
+    mode: 0755
+    recurse: True
+
+- name: Mount the new filesystem now and create a fstab entry so it will be mounted on boot
+  ansible.posix.mount:
+    path: "{{ volume.mount_point }}"
+    src: UUID={{ filesystem_uuid }}
+    state: mounted
+    fstype: "{{ volume.fstype }}"
+    opts: defaults,nofail
+    dump: 0
