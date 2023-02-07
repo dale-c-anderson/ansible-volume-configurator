@@ -1,9 +1,5 @@
 ---
 volumes:
- - device: /dev/this-device-does-not-exist
-   mount_point: /mnt/hopefully-this-fails
-   fstype: ext4
-
  - device: /dev/nvme1n1
    mount_point: /mnt/foo
    fstype: ext4
