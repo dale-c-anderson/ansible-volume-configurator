@@ -36,6 +36,7 @@
 - name: Get UUID of the filesystem
   ansible.builtin.command: "{{ uuid_cmd }}"
   register: uuid_result
+  changed_when: never  # This command isn't changing anything, so don't ever report it as changed
 
 - name: debug uuid_result
   ansible.builtin.debug:
