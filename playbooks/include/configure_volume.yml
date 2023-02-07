@@ -1,0 +1,19 @@
+---
+    - name: Get UUID of device
+      ansible.builtin.command: lsblk {{ volume.device }} -no UUID
+      register: uuid_result
+
+    - set_fact:
+        uuid: "{{ uuid_result.stdout_lines[0]|trim() }}"
+
+    - debug:
+        var: uuid
+
+#    - name: Mount new volumes and create fstab entries
+#      ansible.posix.mount:
+#        path: "{{ item.item.mount }}"
+#        src: UUID={{ item.stdout_lines[0] }}
+#        state: mounted
+#        fstype: xfs
+#        opts: defaults,nofail
+#      loop: "{{ uuid.results }}"

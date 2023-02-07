@@ -1,0 +1,12 @@
+---
+- name: Format and mount additional ec2 volumes after the instance is first created
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  become: no
+  roles: []
+  tasks:
+    - include_tasks: ./include/configure_volume.yml
+      loop: "{{ volumes }}"
+      loop_control:
+        loop_var: volume

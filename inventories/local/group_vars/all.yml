@@ -1,0 +1,13 @@
+---
+volumes:
+ - device: /dev/xvdf
+   mount_point: /mnt/foo
+   fstype: ext4
+
+ - device: /dev/xvdg
+   mount_point: /mnt/bar
+   fstype: ext4
+
+ - device: /dev/xvdh
+   mount_point: /mnt/baz
+   fstype: ext4
