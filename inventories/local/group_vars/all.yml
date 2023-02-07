@@ -1,13 +1,13 @@
 ---
 volumes:
- - device: /dev/xvdf
-   mount_point: /mnt/foo
-   fstype: ext4
+ - device: /dev/sdf
+   mount_point: /u01
+   fstype: xfs
 
- - device: /dev/xvdg
-   mount_point: /mnt/bar
-   fstype: ext4
+ - device: /dev/sdg
+   mount_point: /u01/adminApp
+   fstype: xfs
 
- - device: /dev/xvdh
-   mount_point: /mnt/baz
-   fstype: ext4
+ - device: /dev/sdh
+   mount_point: /u03
+   fstype: xfs
