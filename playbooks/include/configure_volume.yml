@@ -1,5 +1,16 @@
 ---
-- name: define command
+- name: Make Sure we are not about to mess with root volume
+  assert:
+    that: volume.device not in ["/dev/xvda", "/dev/nvme0n1", "/dev/sda"]
+
+- name: Format the filesystem
+  community.general.filesystem:
+    dev: "{{ volume.device }}"
+    fstype: "{{ volume.fstype}}"
+    resizefs: yes
+    force: no  # Prevent accidents.
+
+- name: define uuid command
   set_fact:
     uuid_cmd: "lsblk {{ volume.device }} -no UUID"
 
