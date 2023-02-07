@@ -10,7 +10,7 @@
       - volume.device not in ["/dev/xvda", "/dev/nvme0n1", "/dev/sda"]
 
 - name: Make Sure the specified device exists
-  command:
+  assert:
     that:
       - device_stat_result.stat.exists
 
