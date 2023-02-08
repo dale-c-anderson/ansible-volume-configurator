@@ -48,10 +48,10 @@
 
     - name: Collect volume info
       ec2_vol_info:
-        filters:
-          region: "{{ aws_region }}"
-          volume_ids:
-            - "{{ volume_ids }}"
+        region: "{{ aws_region }}"
+        volume_ids:
+          - "{{ volume_ids }}"
+
       register: volume_info
 
     - name: Debug volume_info
