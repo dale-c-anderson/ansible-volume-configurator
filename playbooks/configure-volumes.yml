@@ -38,20 +38,19 @@
       debug:
           var: block_device_mappings
 
-    - name: Filter out root volume from block_device_mappings
+    - name: Get volume ID of root device
       set_fact:
-        block_device_mappings: "{{ block_device_mappings | rejectattr('device_name', 'equalto', '/dev/xvda') | list }}"
+        root_volume_id: "{{ block_device_mappings | attr('device_name', 'equalto', '/dev/xvda') | list }}"
 
-    - name: Get volume IDs from secondary volumes
-      set_fact:
-          volume_ids: "{{ block_device_mappings | map(attribute='ebs.volume_id') | list }}"
+    - name: Debug root_volume_id
+      debug:
+        var: root_volume_id
 
     - name: Collect volume info
       ec2_vol_info:
         region: "{{ aws_region }}"
-        volume_ids:
-          - "{{ volume_ids }}"
-
+        filters:
+          attachment.instance-id: "{{ instance_id }}"
       register: volume_info
 
     - name: Debug volume_info
