@@ -1,4 +1,4 @@
 # Python 3 pip module requirements
 boto3
 botocore
-ansible
+ansible==2.10
