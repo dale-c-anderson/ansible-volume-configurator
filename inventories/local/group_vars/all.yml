@@ -1,15 +1,2 @@
 ---
-volumes:
- - device: /dev/xvdf
-   mount_point: /u01
-   fstype: xfs
-
- - device: /dev/xvdg
-   mount_point: /u01/adminApp
-   fstype: xfs
-
- - device: /dev/xvdh
-   mount_point: /u03
-   fstype: xfs
-
 aws_region: ca-central-1
