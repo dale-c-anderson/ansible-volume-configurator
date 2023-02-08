@@ -59,7 +59,7 @@
 
     - name: Exclude root volume from list of volumes to configure
       set_fact:
-        secondary_volumes: "{{ volume_info.volumes | selectattr('volume_id', 'notequalto', root_volume_id) | list }}"
+        secondary_volumes: "{{ volume_info.volumes | rejectattr('volume_id', 'equalto', root_volume_id) | list }}"
 
     - name: Debug secondary_volumes
       debug:
