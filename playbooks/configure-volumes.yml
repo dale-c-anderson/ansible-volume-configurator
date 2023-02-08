@@ -40,7 +40,7 @@
 
     - name: Get volume ID of root device
       set_fact:
-        root_volume_id: "{{ block_device_mappings | attr('device_name', 'equalto', '/dev/xvda') | list }}"
+        root_volume_id: "{{ block_device_mappings | selectattr('device_name', 'equalto', '/dev/xvda') | map(attribute='ebs.volume_id') | list | first }}"
 
     - name: Debug root_volume_id
       debug:
