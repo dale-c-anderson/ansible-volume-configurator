@@ -24,7 +24,7 @@
           - instance_id.startswith("i-")
 
     - name: Gather the rest of the instance info
-      ec2_instance_info:
+      amazon.aws.ec2_instance_info:
         region: ca-central-1
         filters:
           instance_ids:
