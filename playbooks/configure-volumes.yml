@@ -25,7 +25,7 @@
 
     - name: Gather the rest of the instance info
       ec2_instance_info:
-        region: ca-central-1
+        region: "{{ aws_region }}"
         instance_ids:
           - "{{ instance_id }}"
       register: ec2_facts
@@ -49,7 +49,7 @@
     - name: Collect volume info
       ec2_vol_info:
         filters:
-          region: ca-central-1
+          region: "{{ aws_region }}"
           volume_ids:
             - "{{ volume_ids }}"
       register: volume_info

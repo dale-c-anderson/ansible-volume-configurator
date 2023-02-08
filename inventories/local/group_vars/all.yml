@@ -11,3 +11,5 @@ volumes:
  - device: /dev/xvdh
    mount_point: /u03
    fstype: xfs
+
+aws_region: ca-central-1
