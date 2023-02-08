@@ -1,5 +1,2 @@
 ---
-volumes:
- - device: /dev/nvme1n1
-   mount_point: /mnt/foo
-   fstype: ext4
+aws_region: us-west-2

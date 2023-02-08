@@ -6,7 +6,72 @@
   become: no
   roles: []
   tasks:
-    - include_tasks: ./include/configure_volume.yml
-      loop: "{{ volumes }}"
+    - name: Find our own instance ID. There is a better way to do this, but it requires ansible more modern than 2.9
+      shell: /usr/bin/curl -s http://169.254.169.254/latest/meta-data/instance-id
+      register: instance_id_result
+      changed_when: False
+
+    - name: debug instance_id_result
+      debug:
+          var: instance_id_result
+
+    - set_fact:
+        instance_id: "{{ instance_id_result.stdout_lines[0]|trim() }}"
+
+    - assert:
+        that:
+          - (instance_id | length) == 19
+          - instance_id.startswith("i-")
+
+    - name: Gather the rest of the instance info
+      ec2_instance_info:
+        region: "{{ aws_region }}"
+        instance_ids:
+          - "{{ instance_id }}"
+      register: ec2_facts
+
+    - name: Get volume info
+      set_fact:
+        block_device_mappings: "{{ ec2_facts.instances[0].block_device_mappings }}"
+
+    - name: debug block_device_mappings
+      debug:
+          var: block_device_mappings
+
+    - name: Get volume ID of root device
+      set_fact:
+        root_volume_id: "{{ block_device_mappings | selectattr('device_name', 'equalto', '/dev/xvda') | map(attribute='ebs.volume_id') | list | first }}"
+
+    - name: Debug root_volume_id
+      debug:
+        var: root_volume_id
+
+    - name: Collect volume info
+      ec2_vol_info:
+        region: "{{ aws_region }}"
+        filters:
+          attachment.instance-id: "{{ instance_id }}"
+      register: volume_info
+
+    - name: Debug volume_info
+      debug:
+          var: volume_info
+
+    - name: Exclude root volume from list of volumes to configure
+      set_fact:
+        secondary_volumes: "{{ volume_info.volumes | rejectattr('id', 'equalto', root_volume_id) | list }}"
+
+    - name: Debug secondary_volumes
+      debug:
+          var: secondary_volumes
+
+    - name: Configure secondary volumes
+      include_tasks: ./include/configure_volume.yml
+      loop: "{{ secondary_volumes }}"
       loop_control:
         loop_var: volume
+
+#    - include_tasks: ./include/configure_volume.yml
+#      loop: "{{ volumes }}"
+#      loop_control:
+#        loop_var: volume

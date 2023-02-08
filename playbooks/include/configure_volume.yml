@@ -1,7 +1,32 @@
 ---
+- name: Debug volume object
+  debug:
+      var: volume
+
+- name: Get tag data out of the volume blob
+  set_fact:
+    tags: "{{ volume.tags }}"
+
+- name: Debug tags
+  debug:
+      var: tags
+
+- name: Set the device name
+  set_fact:
+    device: "{{ volume.attachment_set.device }}"
+    fstype: "{{ tags.fstype | default('xfs') }}"
+    mount_point: "{{ tags.FileSystem }}"
+
+- assert:
+    that:
+      - mount_point != '/'
+      - mount_point != '/root'
+      - mount_point != '/boot'
+      - mount_point != ''
+
 - name: Stat the device
   ansible.builtin.stat:
-      path: "{{ volume.device }}"
+      path: "{{ device }}"
   register: device_stat_result
 
 - name: Debug device_stat_result
@@ -11,7 +36,7 @@
 - name: Make Sure we are not about to mess with root volume
   assert:
     that:
-      - volume.device not in ["/dev/xvda", "/dev/nvme0n1", "/dev/sda"]
+      - device not in ["/dev/xvda", "/dev/nvme0n1", "/dev/sda"]
 
 - name: Make Sure the specified device exists
   assert:
@@ -20,14 +45,14 @@
 
 - name: Format the filesystem. Note that since this is a secondary volume, we don't actually need to create a partition first.
   filesystem:
-    dev: "{{ volume.device }}"
-    fstype: "{{ volume.fstype}}"
+    dev: "{{ device }}"
+    fstype: "{{ fstype }}"
     resizefs: yes
     force: no  # Don't re-format if the filesystem already exists.
 
 - name: define uuid_cmd
   set_fact:
-    uuid_cmd: "/sbin/blkid {{ volume.device }} --output value --match-tag UUID"
+    uuid_cmd: "/sbin/blkid {{ device }} --output value --match-tag UUID"
 
 - name: debug uuid_cmd
   ansible.builtin.debug:
@@ -54,12 +79,12 @@
 
 - name: Check if the mount point exists
   ansible.builtin.stat:
-    path: "{{ volume.mount_point }}"
+    path: "{{ mount_point }}"
   register: mount_point_stat_result
 
 - name: Create the mount point if it doesn't exist
   file:
-    path: "{{ volume.mount_point }}"
+    path: "{{ mount_point }}"
     state: directory
     mode: 0755
     recurse: True
@@ -67,9 +92,9 @@
 
 - name: Mount the new filesystem now and create a fstab entry so it will be mounted on boot
   mount:
-    path: "{{ volume.mount_point }}"
+    path: "{{ mount_point }}"
     src: UUID={{ filesystem_uuid }}
     state: mounted
-    fstype: "{{ volume.fstype }}"
+    fstype: "{{ fstype }}"
     opts: defaults,nofail
     dump: 0
