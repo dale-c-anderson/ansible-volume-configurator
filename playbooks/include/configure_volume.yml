@@ -1,4 +1,8 @@
 ---
+- name: Debug volume object
+  debug:
+      var: volume
+
 - name: Get tag data out of the volume blob
   set_fact:
     tags: "{{ volume.tags | default([]) | list }}"
