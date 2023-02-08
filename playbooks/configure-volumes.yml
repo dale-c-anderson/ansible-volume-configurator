@@ -24,11 +24,10 @@
           - instance_id.startswith("i-")
 
     - name: Gather the rest of the instance info
-      amazon.aws.ec2_instance_info:
+      ec2_instance_info:
         region: ca-central-1
-        filters:
-          instance_ids:
-            - "{{ instance_id }}"
+        instance_ids:
+          - "{{ instance_id }}"
       register: ec2_facts
 
     - name: Get volume info
