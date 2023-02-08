@@ -56,6 +56,21 @@
     - name: Debug volume_info
       debug:
           var: volume_info
+
+    - name: Exclude root volume from list of volumes to configure
+      set_fact:
+        secondary_volumes: "{{ volume_info.volumes | selectattr('volume_id', 'notequalto', root_volume_id) | list }}"
+
+    - name: Debug secondary_volumes
+      debug:
+          var: secondary_volumes
+
+    - name: Configure secondary volumes
+      include_tasks: ./include/configure_volume.yml
+      loop: "{{ secondary_volumes }}"
+      loop_control:
+        loop_var: volume
+
 #    - include_tasks: ./include/configure_volume.yml
 #      loop: "{{ volumes }}"
 #      loop_control:
