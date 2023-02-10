@@ -30,23 +30,31 @@
           - "{{ instance_id }}"
       register: ec2_facts
 
-    - name: Get volume info
+    - name: Get root_device_name
+      set_fact:
+        root_device_name: "{{ ec2_facts.instances[0].root_device_name }}"
+
+    - name: Debug root_device_name
+      debug:
+          var: root_device_name
+
+    - name: Get block_device_mappings
       set_fact:
         block_device_mappings: "{{ ec2_facts.instances[0].block_device_mappings }}"
 
-    - name: debug block_device_mappings
+    - name: Debug block_device_mappings
       debug:
           var: block_device_mappings
 
     - name: Get volume ID of root device
       set_fact:
-        root_volume_id: "{{ block_device_mappings | selectattr('device_name', 'equalto', '/dev/xvda') | map(attribute='ebs.volume_id') | list | first }}"
+        root_volume_id: "{{ block_device_mappings | selectattr('device_name', 'equalto', root_device_name) | map(attribute='ebs.volume_id') | list | first }}"
 
     - name: Debug root_volume_id
       debug:
         var: root_volume_id
 
-    - name: Collect volume info
+    - name: Collect volume info, which also includes critical tag data. If we didn't need the tags, we could just use the block_device_mappings.
       ec2_vol_info:
         region: "{{ aws_region }}"
         filters:
@@ -70,8 +78,3 @@
       loop: "{{ secondary_volumes }}"
       loop_control:
         loop_var: volume
-
-#    - include_tasks: ./include/configure_volume.yml
-#      loop: "{{ volumes }}"
-#      loop_control:
-#        loop_var: volume
