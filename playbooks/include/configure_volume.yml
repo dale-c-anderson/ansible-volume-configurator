@@ -48,17 +48,22 @@
     os_device: "{{ hypervisor_device }}"
   when: not hyp_dev_stat_result.stat.islnk
 
+- name: Debug os_device
+  debug:
+      var: os_device
+
 - name: Make Sure we are not about to mess with root volume
   assert:
     that:
       - os_device not in ["/dev/xvda", "/dev/nvme0n1", "/dev/sda"]
 
 - name: Format the filesystem. Note that since this is a secondary volume, we don't actually need to create a partition first.
-  filesystem:
-    dev: "{{ os_device }}"
-    fstype: "{{ fstype }}"
-    resizefs: yes
-    force: no  # Don't re-format if the filesystem already exists.
+  command: mkfs.{{ fstype }} -f {{ os_device }}
+  register: mkfs_result
+
+- name: Debug mkfs_result
+  debug:
+      var: mkfs_result
 
 - name: define uuid_cmd
   set_fact:
