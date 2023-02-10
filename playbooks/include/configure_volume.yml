@@ -60,6 +60,8 @@
 - name: Format the filesystem. Note that since this is a secondary volume, we don't actually need to create a partition first.
   command: mkfs.{{ fstype }} -f {{ os_device }}
   register: mkfs_result
+  changed_when: not mkfs_result.stderr.contains("{{ os_device }} contains a mounted filesystem")
+  failed_when: mkfs_result.stderr != '' and not mkfs_result.stderr.contains("{{ os_device }} contains a mounted filesystem")
 
 - name: Debug mkfs_result
   debug:
