@@ -61,7 +61,7 @@
   command: mkfs.{{ fstype }} -f {{ os_device }}
   register: mkfs_result
   changed_when: not mkfs_result.stderr.contains("{{ os_device }} contains a mounted filesystem")
-  failed_when: mkfs_result.stderr != '' and not mkfs_result.stderr.contains("{{ os_device }} contains a mounted filesystem")
+  failed_when: mkfs_result.stderr != '' and not "{{ os_device }} contains a mounted filesystem" in mkfs_result.stderr
 
 - name: Debug mkfs_result
   debug:
