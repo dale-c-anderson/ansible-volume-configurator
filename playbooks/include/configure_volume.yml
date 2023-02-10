@@ -33,29 +33,99 @@
   debug:
     var: hyp_dev_stat_result
 
-- name: Make Sure the specified hypervisor_device exists (its probably a symlink)
-  assert:
-    that:
-      - hyp_dev_stat_result.stat.exists
+- name: os_device path 1 of 3 - Translate hypervisor_device to os_device on non-AWS provided images
+  when: not hyp_dev_stat_result.stat.exists
+  block:
+    - name: Define NVME translation map for secondary volumes
+      set_fact:
+        device_map:
+          "/dev/xvdf": "/dev/nvme1n1"
+          "/dev/xvdg": "/dev/nvme2n1"
+          "/dev/xvdh": "/dev/nvme3n1"
+          "/dev/xvdi": "/dev/nvme4n1"
+          "/dev/xvdj": "/dev/nvme5n1"
+          "/dev/xvdk": "/dev/nvme6n1"
+          "/dev/sdf": "/dev/nvme1n1"
+          "/dev/sdg": "/dev/nvme2n1"
+          "/dev/sdh": "/dev/nvme3n1"
+          "/dev/sdi": "/dev/nvme4n1"
+          "/dev/sdj": "/dev/nvme5n1"
+          "/dev/sdk": "/dev/nvme6n1"
+    - Name: Translate hypervisor device name to NVME device name
+      set_fact:
+        nvme_device: "{{ device_map[hypervisor_device] }}"
+    - name: Debug nvme_device
+      debug:
+        var: nvme_device
 
-- name: Translate the hypervisor device name to the OS device name when the hypervisor device is a symlink
+    - name: Stat nvme_device
+      ansible.builtin.stat:
+          path: "{{ nvme_device }}"
+      register: nvme_device_stat_result
+
+    - name: Debug nvme_device_stat_result
+      debug:
+        var: nvme_device_stat_result
+
+    - name: Make sure nvme device exists
+      assert:
+        that:
+          - nvme_device_stat_result.stat.exists
+
+    - name: Sanity check - Gather NVME info, which should have the external hypervisor device name buried in it
+      ansible.builtin.shell: "/sbin/nvme id-ctrl -v {{ nvme_device }}"
+      register: nvme_info_result
+
+    - name: Debug nvme_info_result
+      debug:
+        var: nvme_info_result
+
+    - set_fact:
+        short_hyp_dev_name: "{{ hypervisor_device | replace('/dev/', '') }}"
+        full_hyp_device_name: "{{ hypervisor_device }}"
+    - name: Make sure nvme device has the expected hypervisor device name
+      # "{{ short_hyp_dev_name }}............."   / "sdh............."
+      # "{{ full_hyp_device_name    }}........"   / "/dev/sdh........"
+      assert:
+        that:
+          - >
+            '"{{ short_hyp_dev_name }}............."' in nvme_info_result.stdout or
+            '"{{ full_hyp_device_name    }}........"' in nvme_info_result.stdout
+
+    - name: Finally, set the os_device name to the nvme_device name
+      set_fact:
+        os_device: "{{ nvme_device }}"
+
+- name: os_device path 2 of 3  - Translate the hypervisor device name to the OS device name when the hypervisor device is a symlink (which it will be on aws-provided images)
   set_fact:
     os_device: "{{ hyp_dev_stat_result.stat.lnk_source }}"
-  when: hyp_dev_stat_result.stat.islnk
+  when: hyp_dev_stat_result.stat.exists
+    and hyp_dev_stat_result.stat.islnk
 
-- name: Use the hypervisor device name as the OS device name when the hypervisor device is not a symlink
+- name: os_device path 3 of 3  - Use the hypervisor device name directly as the OS device name when the hypervisor device is not a symlink
   set_fact:
     os_device: "{{ hypervisor_device }}"
-  when: not hyp_dev_stat_result.stat.islnk
+  when: hyp_dev_stat_result.stat.exists
+    and not hyp_dev_stat_result.stat.islnk
 
-- name: Debug os_device
+- name: Debug os_device name
   debug:
       var: os_device
 
-- name: Make Sure we are not about to mess with root volume
+- name: Stat os_device
+  ansible.builtin.stat:
+      path: "{{ os_device }}"
+  register: os_dev_stat_result
+
+- name: Make sure the os_device exists
   assert:
     that:
-      - os_device not in ["/dev/xvda", "/dev/nvme0n1", "/dev/sda"]
+      - os_dev_stat_result.stat.exists
+
+- name: Make sure we are not about to mess with root device
+  assert:
+    that:
+      - os_device not in ["/dev/xvda", "/dev/nvme0n1", "/dev/sda", "/dev/sda1"]
 
 - name: Format the filesystem. Note that since this is a secondary volume, we don't actually need to create a partition first.
   command: mkfs.{{ fstype }} -f {{ os_device }}
