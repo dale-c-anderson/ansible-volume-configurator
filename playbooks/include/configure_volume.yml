@@ -67,7 +67,7 @@
 
 - name: define uuid_cmd
   set_fact:
-    uuid_cmd: "/sbin/blkid {{ os_device }} --output value --match-tag UUID"
+    uuid_cmd: "/sbin/blkid {{ os_device }} -o value -s UUID"
 
 - name: debug uuid_cmd
   ansible.builtin.debug:
