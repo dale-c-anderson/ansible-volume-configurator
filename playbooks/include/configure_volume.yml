@@ -11,9 +11,9 @@
   debug:
       var: tags
 
-- name: Set the device name
+- name: Set some variables
   set_fact:
-    device: "{{ volume.attachment_set.device }}"
+    hypervisor_device: "{{ volume.attachment_set.device }}"
     fstype: "{{ tags.fstype | default('xfs') }}"
     mount_point: "{{ tags.FileSystem }}"
 
@@ -24,35 +24,45 @@
       - mount_point != '/boot'
       - mount_point != ''
 
-- name: Stat the device
+- name: Stat the hypervisor_device
   ansible.builtin.stat:
-      path: "{{ device }}"
-  register: device_stat_result
+      path: "{{ hypervisor_device }}"
+  register: hyp_dev_stat_result
 
-- name: Debug device_stat_result
+- name: Debug hyp_dev_stat_result
   debug:
-    var: device_stat_result
+    var: hyp_dev_stat_result
+
+- name: Make Sure the specified hypervisor_device exists (its probably a symlink)
+  assert:
+    that:
+      - hyp_dev_stat_result.stat.exists
+
+- name: Translate the hypervisor device name to the OS device name when the hypervisor device is a symlink
+  set_fact:
+    os_device: "{{ hyp_dev_stat_result.stat.lnk_source }}"
+  when: hyp_dev_stat_result.stat.islnk
+
+- name: Use the hypervisor device name as the OS device name when the hypervisor device is not a symlink
+  set_fact:
+    os_device: "{{ hypervisor_device }}"
+  when: not hyp_dev_stat_result.stat.islnk
 
 - name: Make Sure we are not about to mess with root volume
   assert:
     that:
-      - device not in ["/dev/xvda", "/dev/nvme0n1", "/dev/sda"]
-
-- name: Make Sure the specified device exists
-  assert:
-    that:
-      - device_stat_result.stat.exists
+      - os_device not in ["/dev/xvda", "/dev/nvme0n1", "/dev/sda"]
 
 - name: Format the filesystem. Note that since this is a secondary volume, we don't actually need to create a partition first.
   filesystem:
-    dev: "{{ device }}"
+    dev: "{{ os_device }}"
     fstype: "{{ fstype }}"
     resizefs: yes
     force: no  # Don't re-format if the filesystem already exists.
 
 - name: define uuid_cmd
   set_fact:
-    uuid_cmd: "/sbin/blkid {{ device }} --output value --match-tag UUID"
+    uuid_cmd: "/sbin/blkid {{ os_device }} --output value --match-tag UUID"
 
 - name: debug uuid_cmd
   ansible.builtin.debug:
