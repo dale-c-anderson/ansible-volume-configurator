@@ -33,28 +33,51 @@
   debug:
     var: hyp_dev_stat_result
 
-- name: os_device path 1 of 3 - Translate hypervisor_device to os_device on non-AWS provided images
+- name: os_device path 1 of 3 - Translate hypervisor_device to os_device on non-AWS provided images. This is NASTY.
   when: not hyp_dev_stat_result.stat.exists
   block:
-    - name: Define NVME translation map for secondary volumes
-      set_fact:
-        device_map:
-          "/dev/xvdf": "/dev/nvme1n1"
-          "/dev/xvdg": "/dev/nvme2n1"
-          "/dev/xvdh": "/dev/nvme3n1"
-          "/dev/xvdi": "/dev/nvme4n1"
-          "/dev/xvdj": "/dev/nvme5n1"
-          "/dev/xvdk": "/dev/nvme6n1"
-          "/dev/sdf": "/dev/nvme1n1"
-          "/dev/sdg": "/dev/nvme2n1"
-          "/dev/sdh": "/dev/nvme3n1"
-          "/dev/sdi": "/dev/nvme4n1"
-          "/dev/sdj": "/dev/nvme5n1"
-          "/dev/sdk": "/dev/nvme6n1"
+    - name: Get list of block devices, excluding the root block device
+      ansible.builtin.shell: "/bin/lsblk -d -n -p -o NAME | grep -v nvme0n1 | grep -v xvda | grep -v sda"
+      register: lsblk_result
 
-    - name: Translate hypervisor device name to NVME device name
+    - name: Gather NVME info for each nvme block device. The info of each device has the external hypervisor device name buried in it.
+      ansible.builtin.shell: "/sbin/nvme id-ctrl -v {{ nvme_device }}"
+      with_items: "{{ lsblk_result.stdout_lines }}"
+      loop_control:
+        loop_var: nvme_device
+      register: nvme_info_result
+
+    - set_fact:
+        short_hyp_dev_name: "{{ hypervisor_device | replace('/dev/', '') }}"
+        full_hyp_device_name: "{{ hypervisor_device }}"
+
+    - name: Determine which nvme block device belongs to the hypervisor device we're processing
       set_fact:
-        nvme_device: "{{ device_map[hypervisor_device] }}"
+          nvme_device: >
+            {{ nvme_info_item.stdout | regex_search('"(sd.)') }}
+      when: nvme_info_item.stdout | regex_search(short_hyp_dev_name)
+      with_items: "{{ nvme_info_result.results }}"
+      loop_control:
+        loop_var: nvme_info_item
+
+    - fail:
+      when: true
+
+
+    # Binary data line will look something like
+    # 0000: 73 64 66 20 20 20 20 20 20 20 20 20 20 20 20 20 "sdf............."
+    - name: Limit the nvme info to *just* the line with the hypervsior device name
+      set_fact:
+        filtered_nvme_info_result: > 
+          {{ nvme_info_result.stdout | regex_search('\d+:(\d\d )+ "(/dev/)?(sd.)\.+"') }}
+
+    - name: debug filtered_nvme_info_result
+      debug:
+          var: filtered_nvme_info_result
+
+    - name: Extract the hypervisor device name from filtered_nvme_info_result
+      set_fact:
+        hypervisor_device: "{{ filtered_nvme_info_result[-1] | regex_search('sd.') }}"
 
     - name: Debug nvme_device
       debug:
@@ -74,17 +97,9 @@
         that:
           - nvme_device_stat_result.stat.exists
 
-    - name: Sanity check - Gather NVME info, which should have the external hypervisor device name buried in it
-      ansible.builtin.shell: "/sbin/nvme id-ctrl -v {{ nvme_device }}"
-      register: nvme_info_result
-
     - name: Debug nvme_info_result
       debug:
         var: nvme_info_result
-
-    - set_fact:
-        short_hyp_dev_name: "{{ hypervisor_device | replace('/dev/', '') }}"
-        full_hyp_device_name: "{{ hypervisor_device }}"
 
     - name: Make sure nvme device has the expected hypervisor device name
       # "{{ short_hyp_dev_name }}............."   / "sdh............."
