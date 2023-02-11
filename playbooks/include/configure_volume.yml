@@ -60,6 +60,10 @@
       loop_control:
         loop_var: nvme_info_item
 
+    - name: Debug nvme_device
+      debug:
+        var: nvme_device
+
     - fail:
       when: true
 
@@ -79,9 +83,6 @@
       set_fact:
         hypervisor_device: "{{ filtered_nvme_info_result[-1] | regex_search('sd.') }}"
 
-    - name: Debug nvme_device
-      debug:
-        var: nvme_device
 
     - name: Stat nvme_device
       ansible.builtin.stat:
