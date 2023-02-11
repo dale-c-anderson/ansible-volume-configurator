@@ -50,10 +50,6 @@
     - debug:
         var: nvme_info_results
 
-
-    - fail:
-      when: true
-
     - set_fact:
         short_hyp_dev_name: "{{ hypervisor_device | replace('/dev/', '') }}"
         full_hyp_device_name: "{{ hypervisor_device }}"
@@ -64,7 +60,7 @@
 
     - name: Determine which nvme block device belongs to the hypervisor device we're processing
       set_fact:
-          nvme_device: nvme_info_item.stdout
+          nvme_device: nvme_info_item.nvme_device
             {{ nvme_info_item.stdout | regex_search('"(sd.)') }}
       when: nvme_info_item.stdout | regex_search(regex_search_term)
       with_items: "{{ nvme_info_results.results }}"
