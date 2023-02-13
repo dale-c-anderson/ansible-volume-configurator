@@ -29,7 +29,7 @@
         If you use an image that does not perform the automatic mapping, and the instance 
         supports NVMe, you will need to run the NVMe version of this playbook instead.        
 
-      include_tasks: ./configure-volumes-by-ebs-metadata.yml
+      include_tasks: include/configure-volumes-by-ebs-metadata.yml
       when: not use_nvme_playbook
 
     - name: |
@@ -41,5 +41,5 @@
     
         Read more at https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvme-ebs-volumes.html
 
-      include_tasks: ./configure-volumes-by-nvme.yml
+      include_tasks: include/configure-volumes-by-nvme.yml
       when: use_nvme_playbook
