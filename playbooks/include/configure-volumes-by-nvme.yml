@@ -8,6 +8,7 @@
     - name: Collect NVME devices list from the OS, excluding root OS device
       shell:  /bin/lsblk -d -n -p -o NAME | grep nvme | grep -v nvme0n1 | grep -v xvda | grep -v sda
       register: nvme_devices
+      changed_when: false  # This is a read-only operation, so it should never be marked as changed.
 
     - name: Debug nvme_devices
       debug:
