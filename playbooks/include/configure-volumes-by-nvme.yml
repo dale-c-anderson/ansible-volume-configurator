@@ -1,10 +1,4 @@
 ---
-    - name: Gather block_device_mapping metadata - creates "block_device_mappings" variable
-      include_tasks: ./collect_ebs_block_device_mappings.yml
-
-    - name: Filter out root volume from block_device_mappings - creates "secondary_volumes" variable
-      include_tasks: ./collect_ebs_block_device_mappings.yml
-
     - name: Collect NVME devices list from the OS, excluding root OS device
       shell:  /bin/lsblk -d -n -p -o NAME | grep nvme | grep -v nvme0n1 | grep -v xvda | grep -v sda
       register: nvme_devices
