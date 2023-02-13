@@ -11,18 +11,18 @@
 
 - name: Extract volume ID from nvme_info_result (shows up as serial number)
   shell: echo "{{ nvme_info_result.stdout }}" | grep '^sn' | awk '{print $3}' | sed s'/vol/vol-/'
-  register: nvme_volume_id_result
+  register: ebs_volume_id_result
 
-- name: debug nvme_volume_id_result
+- name: debug ebs_volume_id_result
   debug:
-    var: nvme_volume_id_result
+    var: ebs_volume_id_result
     verbosity: 1
 
 - set_fact:
-    nvme_volume_id: "{{ nvme_volume_id_result.stdout }}"
+    ebs_volume_id: "{{ ebs_volume_id_result.stdout }}"
 
 - debug:
-    var: nvme_volume_id
+    var: ebs_volume_id
 
 - name: Extract the device name from NVME vendor info.
   shell: echo "{{ nvme_info_result.stdout }}" | grep '^0000' | grep -o 'sd.'
@@ -43,12 +43,21 @@
     var: secondary_volumes
     verbosity: 1
 
-- name: Select the corresponding ebs block device metadata, so we can read on its tags
+- name: Filter the correct ebs device metadata, so we can read on its tags
   set_fact:
-    volume: "{{ secondary_volumes | selectattr('device', 'equalto', ebs_external_block_device_name) | list }}"
+    selected_volumes: "{{ secondary_volumes | selectattr('id', 'equalto', ebs_volume_id) | list }}"
+
+- set_fact:
+    volume: "{{ selected_volumes[0] }}"
+
+- name: Sanity check - make sure ebs hypervisor device name matches the one we found in the nvme vendor info
+  assert:
+    that:
+      - ebs_external_block_device_name == volume.attachment_set.device
+
+- name: Set os_device to nvme_device
+  set_fact:
     os_device: "{{ nvme_device }}"
 
 - name: Now we can resume the regular configure_volume.yml playbook
   include_tasks: configure_volume.yml
-  vars:
-    volume: "{{ volume[0] }}"
