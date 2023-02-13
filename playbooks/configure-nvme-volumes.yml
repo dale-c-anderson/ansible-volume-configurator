@@ -49,6 +49,6 @@
 
     - name: Configure secondary volumes
       include_tasks: ./include/configure_nvme_volume.yml
-      loop: "{{ nvme_devices.stdout_lines }}"
+      loop: "{{ nvme_devices.stdout_lines | list }}"
       loop_control:
         loop_var: nvme_device

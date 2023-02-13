@@ -1,0 +1,141 @@
+---
+- name: Debug volume object
+  debug:
+      var: volume
+
+- name: Get tag data out of the volume blob
+  set_fact:
+    tags: "{{ volume.tags }}"
+
+- name: Debug tags
+  debug:
+      var: tags
+
+- name: Set some facts
+  set_fact:
+    hypervisor_device: "{{ volume.attachment_set.device }}"
+    fstype: "{{ tags.fstype | default('xfs') }}"
+    mount_point: "{{ tags.FileSystem }}"
+
+- assert:
+    that:
+      - mount_point != '/'
+      - mount_point != '/root'
+      - mount_point != '/boot'
+      - mount_point != ''
+
+- name: Stat the hypervisor_device
+  ansible.builtin.stat:
+      path: "{{ hypervisor_device }}"
+  register: device_stat_result
+
+- name: Debug device_stat_result
+  debug:
+    var: device_stat_result
+
+- name: Make Sure we are not about to mess with root volume
+  assert:
+    that:
+      - device not in ["/dev/xvda", "/dev/nvme0n1", "/dev/nvme0n1p1", "/dev/sda", "/dev/sda1"]
+
+- name: Make Sure the specified device exists
+  assert:
+    that:
+      - device_stat_result.stat.exists
+
+- name: Fallback when using non-amazon provided images
+  when: not device_stat_result.stat.exists
+  block:
+    - name: Define translation map for secondary volumes
+      set_fact:
+        device_map:
+          "/dev/xvdf": "/dev/nvme1n1"
+          "/dev/xvdg": "/dev/nvme2n1"
+          "/dev/xvdh": "/dev/nvme3n1"
+          "/dev/xvdi": "/dev/nvme4n1"
+          "/dev/xvdj": "/dev/nvme5n1"
+          "/dev/xvdk": "/dev/nvme6n1"
+          "/dev/sdf": "/dev/nvme1n1"
+          "/dev/sdg": "/dev/nvme2n1"
+          "/dev/sdh": "/dev/nvme3n1"
+          "/dev/sdi": "/dev/nvme4n1"
+          "/dev/sdj": "/dev/nvme5n1"
+          "/dev/sdk": "/dev/nvme6n1"
+    - Name: Translate hypervisor device name to NVME device name
+      set_fact:
+        nvme_device: "{{ device_map[device] }}"
+      when: device.startswith("/dev/sd")
+
+    - name: Debug device
+      debug:
+        var: device
+
+    - name: Stat the device
+      ansible.builtin.stat:
+          path: "{{ device }}"
+      register: device_stat_result
+
+    - name: Make Sure the specified device exists
+      assert:
+        that:
+          - device_stat_result.stat.exists
+
+
+
+- name: Fall back to finding the
+
+- name: Format the filesystem. Note that since this is a secondary volume, we don't actually need to create a partition first.
+  filesystem:
+    dev: "{{ device }}"
+    fstype: "{{ fstype }}"
+    resizefs: yes
+    force: no  # Don't re-format if the filesystem already exists.
+
+- name: define uuid_cmd
+  set_fact:
+    uuid_cmd: "/sbin/blkid {{ device }} --output value --match-tag UUID"
+
+- name: debug uuid_cmd
+  ansible.builtin.debug:
+      var: uuid_cmd
+
+- name: Get UUID of the filesystem
+  ansible.builtin.command: "{{ uuid_cmd }}"
+  register: uuid_result
+  changed_when: False  # This command isn't changing anything, so don't ever report it as changed
+
+- name: debug uuid_result
+  ansible.builtin.debug:
+    var: uuid_result
+
+- set_fact:
+    filesystem_uuid: "{{ uuid_result.stdout_lines[0]|trim() }}"
+
+- debug:
+    var: filesystem_uuid
+
+- assert:
+    that:
+      - (filesystem_uuid | length) == 36
+
+- name: Check if the mount point exists
+  ansible.builtin.stat:
+    path: "{{ mount_point }}"
+  register: mount_point_stat_result
+
+- name: Create the mount point if it doesn't exist
+  file:
+    path: "{{ mount_point }}"
+    state: directory
+    mode: 0755
+    recurse: True
+  when: not mount_point_stat_result.stat.exists
+
+- name: Mount the new filesystem now and create a fstab entry so it will be mounted on boot
+  mount:
+    path: "{{ mount_point }}"
+    src: UUID={{ filesystem_uuid }}
+    state: mounted
+    fstype: "{{ fstype }}"
+    opts: defaults,nofail
+    dump: 0
