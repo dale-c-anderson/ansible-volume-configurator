@@ -44,6 +44,9 @@
       shell:  /bin/lsblk -d -n -p -o NAME | grep -v nvme0n1 | grep -v xvda | grep -v sda
       register: nvme_devices
 
+    - debug:
+        var: nvme_devices
+
     - name: Configure secondary volumes
       include_tasks: ./include/configure_nvme_volume.yml
       loop: "{{ nvme_devices.stdout_lines }}"
