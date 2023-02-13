@@ -39,6 +39,9 @@
 - debug:
     var: nvme_external_block_device_name
 
+- debug:
+    var: secondary_volumes
+
 - name: Select the corresponding ebs block device metadata, so we can read on its tags
   set_fact:
     volume: "{{ secondary_volumes | selectattr('device_name', 'equalto', nvme_external_block_device_name) | list }}"
