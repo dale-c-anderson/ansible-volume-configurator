@@ -7,6 +7,7 @@
 - name: debug nvme_info_result
   debug:
     var: nvme_info_result
+    verbosity: 1
 
 - name: Extract volume ID from nvme_info_result (shows up as serial number)
   shell: echo "{{ nvme_info_result.stdout }}" | grep '^sn' | awk '{print $3}' | sed s'/vol/vol-/'
@@ -15,6 +16,13 @@
 - name: debug nvme_volume_id_result
   debug:
     var: nvme_volume_id_result
+    verbosity: 1
+
+- set_fact:
+    nvme_volume_id: "{{ nvme_volume_id_result.stdout }}"
+
+- debug:
+    var: nvme_volume_id
 
 - name: Extract the device name from NVME vendor info.
   shell: echo "{{ nvme_info_result.stdout }}" | grep '^0000' | grep -o 'sd.'
@@ -23,3 +31,10 @@
 - name: debug nvme_external_block_device_name_result
   debug:
     var: nvme_external_block_device_name_result
+    verbosity: 1
+
+- set_fact:
+    nvme_external_block_device_name: "/dev/{{ nvme_external_block_device_name_result.stdout }}"
+
+- debug:
+    var: nvme_external_block_device_name
