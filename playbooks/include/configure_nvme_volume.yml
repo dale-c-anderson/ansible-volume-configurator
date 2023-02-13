@@ -41,7 +41,7 @@
 
 - name: Select the corresponding ebs block device metadata, so we can read on its tags
   set_fact:
-    volume: "{{ ebs_volume_metadata_list | selectattr('device_name', 'equalto', nvme_external_block_device_name) | list }}"
+    volume: "{{ secondary_volumes | selectattr('device_name', 'equalto', nvme_external_block_device_name) | list }}"
     os_device: "{{ nvme_device }}"
 
 - name: Now we can resume the regular configure_volume.yml playbook
