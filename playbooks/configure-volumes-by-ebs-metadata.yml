@@ -1,27 +1,5 @@
 ---
-- name: |
-    Format and mount additional ec2 volumes after the instance is first created.
-    
-    This playbook is for AWS-provided images (Amazon Linux, Ubuntu, etc). 
-    whose systems automatically map the hypervisor device name to the OS device name.
-    (eg they provide symlinks from /dev/sdf to /dev/xvdf or /dev/nvme1n1, etc.)
-  
-    If you use an image that does not perform the automatic mapping, and the instance 
-    supports NVMe, you will need to run the NVMe version of this playbook instead.
-
-  hosts: localhost
-  connection: local
-  gather_facts: true
-  become: no
-  roles: []
-  tasks:
-    - name: Gather block_device_mapping metadata - creates "block_device_mappings" variable
-      include_tasks: ./include/collect_ebs_block_device_mappings.yml
-
-    - name: Filter out root volume from block_device_mappings - creates "secondary_volumes" variable
-      include_tasks: include/collect_ebs_block_device_mappings.yml
-
-    - name: Configure secondary volumes
+    - name: Loop through ebs metadata and configure secondary volumes
       include_tasks: ./include/configure_volume.yml
       loop: "{{ secondary_volumes }}"
       loop_control:

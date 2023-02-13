@@ -1,21 +1,4 @@
 ---
-- name: |
-    Format and mount additional ebs volumes on ec2 after the instance launched (NVMe version).
-    
-    Since AWS does not allow you to specify NVMe device names (in the block device mapping),
-    and since the block device driver in the OS can assign NVMe device names in a different
-    order than you specified for the volumes in the block device mapping, it's necessary 
-    to loops over the NVMe devices in the OS first, and then look up the ebs block 
-    device metatdata for each one. 
-
-    Read more at https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvme-ebs-volumes.html
-
-  hosts: localhost
-  connection: local
-  gather_facts: true
-  become: no
-  roles: []
-  tasks:
     - name: Gather block_device_mapping metadata - creates "block_device_mappings" variable
       include_tasks: ./include/collect_ebs_block_device_mappings.yml
 
