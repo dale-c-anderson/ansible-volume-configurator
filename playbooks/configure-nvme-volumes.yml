@@ -41,7 +41,7 @@
           var: secondary_volumes
 
     - name: Collect NVME devices list, excluding root device
-      shell:  /bin/lsblk -d -n -p -o NAME | grep -v nvme0n1 | grep -v xvda | grep -v sda
+      shell:  /bin/lsblk -d -n -p -o NAME | grep nvme | grep -v nvme0n1 | grep -v xvda | grep -v sda
       register: nvme_devices
 
     - debug:
@@ -49,6 +49,6 @@
 
     - name: Configure secondary volumes
       include_tasks: ./include/configure_nvme_volume.yml
-      loop: "{{ nvme_devices.stdout_lines | list }}"
+      loop: "{{ nvme_devices.stdout_lines }}"
       loop_control:
         loop_var: nvme_device

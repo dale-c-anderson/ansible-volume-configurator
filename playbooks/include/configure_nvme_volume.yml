@@ -1,7 +1,7 @@
 ---
 - name: Gather nvme vendor device info
   shell: > 
-    /sbin/nvme id-ctrl -v "{{ nvme_device }}
+    /sbin/nvme id-ctrl -v "{{ nvme_device }}"
   register: nvme_info_result
 
 - name: debug nvme_info_result
