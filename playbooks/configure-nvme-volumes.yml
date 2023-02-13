@@ -1,27 +1,33 @@
 ---
-- name: Format and mount additional ebs volumes on ec2 after the instance launched (NVMe version).
-    AWS does not allow you to specify NVMe device names in the block device mapping, and the block device driver in
-    the OS can assign NVMe device names in a different order than you specified for the volumes in the block device mapping, 
-    so this is a little different than the XVDx version.
-    See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvme-ebs-volumes.html
+- name: |
+    Format and mount additional ebs volumes on ec2 after the instance launched (NVMe version).
+    
+    Since AWS does not allow you to specify NVMe device names (in the block device mapping),
+    and since the block device driver in the OS can assign NVMe device names in a different
+    order than you specified for the volumes in the block device mapping, it's necessary 
+    to loops over the NVMe devices in the OS first, and then look up the ebs block 
+    device metatdata for each one. 
+
+    Read more at https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvme-ebs-volumes.html
+
   hosts: localhost
   connection: local
   gather_facts: true
   become: no
   roles: []
   tasks:
-    - name: Gather block_device_mappings
+    - name: Gather block_device_mapping metadata
       include_tasks: ./include/collect_ebs_block_device_mappings.yml
 
     - name: Get volume ID of root device from block_device_mappings
       set_fact:
         root_volume_id: "{{ block_device_mappings | selectattr('device_name', 'equalto', root_device_name) | map(attribute='ebs.volume_id') | list | first }}"
 
-    - name: Debug root_volume_id
+    - name: Debug ebs root_volume_id
       debug:
         var: root_volume_id
 
-    - name: Collect volume info, which also includes critical tag data. If we didn't need the tags, we could just use the block_device_mappings.
+    - name: Collect ebs volume info, which also includes critical tag data. If we didn't need the tags, we could just use the block_device_mappings.
       ec2_vol_info:
         region: "{{ aws_region }}"
         filters:
@@ -32,22 +38,23 @@
       debug:
           var: volume_info
 
-    - name: Exclude root volume from list of volumes to configure
+    - name: Exclude root ebs volume metadata from list of volumes to configure
       set_fact:
         secondary_volumes: "{{ volume_info.volumes | rejectattr('id', 'equalto', root_volume_id) | list }}"
 
-    - name: Debug secondary_volumes
+    - name: Debug our list of ebs secondary_volumes metadata
       debug:
           var: secondary_volumes
 
-    - name: Collect NVME devices list, excluding root device
+    - name: Collect NVME devices list from the OS, excluding root OS device
       shell:  /bin/lsblk -d -n -p -o NAME | grep nvme | grep -v nvme0n1 | grep -v xvda | grep -v sda
       register: nvme_devices
 
-    - debug:
+    - name: Debug nvme_devices
+      debug:
         var: nvme_devices
 
-    - name: Configure secondary volumes
+    - name: Loop through NVMe devices, and match each to its corresponding ebs volume metadata
       include_tasks: ./include/configure_nvme_volume.yml
       loop: "{{ nvme_devices.stdout_lines }}"
       loop_control:

@@ -1,5 +1,14 @@
 ---
-- name: Format and mount additional ec2 volumes after the instance is first created
+- name: |
+    Format and mount additional ec2 volumes after the instance is first created.
+    
+    This playbook is for AWS-provided images (Amazon Linux, Ubuntu, etc). 
+    whose systems automatically map the hypervisor device name to the OS device name.
+    (eg they provide symlinks from /dev/sdf to /dev/xvdf or /dev/nvme1n1, etc.)
+  
+    If you use an image that does not perform the automatic mapping, and the instance 
+    supports NVMe, you will need to run the NVMe version of this playbook instead.
+
   hosts: localhost
   connection: local
   gather_facts: true

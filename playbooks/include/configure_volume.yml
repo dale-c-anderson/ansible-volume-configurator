@@ -29,106 +29,24 @@
       path: "{{ hypervisor_device }}"
   register: hyp_dev_stat_result
 
-- name: Debug hyp_dev_stat_result
+- name: Debug hyp_dev_stat_result. For NVMe instances, this will not exist.
   debug:
     var: hyp_dev_stat_result
 
-- name: os_device path 1 of 3 - Translate hypervisor_device to os_device on non-AWS provided images. This is NASTY.
-  when: not hyp_dev_stat_result.stat.exists
-  block:
-    - name: Get list of block devices, excluding the root block device
-      ansible.builtin.shell: "/bin/lsblk -d -n -p -o NAME | grep -v nvme0n1 | grep -v xvda | grep -v sda"
-      register: lsblk_result
+- name: os_device determination path 1 of 3 - NVMe devices on non-AWS-provided images. If you called the NVMe version of the playbook, this will have already been done.
+  fail:
+    msg: Please run the NVMe version of the playbook instead.
+  when:
+    not hyp_dev_stat_result.stat.exists
+    and nvme_device is undefined
 
-    - name: Gather NVME info for each nvme block device. The info of each device has the external hypervisor device name buried in it.
-      ansible.builtin.shell: "/sbin/nvme id-ctrl -v {{ nvme_device }}"
-      with_items: "{{ lsblk_result.stdout_lines }}"
-      loop_control:
-        loop_var: nvme_device
-      register: nvme_info_results
-
-    - debug:
-        var: nvme_info_results
-
-    - set_fact:
-        short_hyp_dev_name: "{{ hypervisor_device | replace('/dev/', '') }}"
-        full_hyp_device_name: "{{ hypervisor_device }}"
-
-    - set_fact:
-        regex_search_term: >
-          '"(' + short_hyp_dev_name + '.)'
-
-    - name: Determine which nvme block device belongs to the hypervisor device we're processing
-      set_fact:
-          nvme_device: nvme_info_item.nvme_device
-            {{ nvme_info_item.stdout | regex_search('"(sd.)') }}
-      when: nvme_info_item.stdout | regex_search(regex_search_term)
-      with_items: "{{ nvme_info_results.results }}"
-      loop_control:
-        loop_var: nvme_info_item
-
-    - name: Debug nvme_device
-      debug:
-        var: nvme_device
-
-    - fail:
-      when: true
-
-
-    # Binary data line will look something like
-    # 0000: 73 64 66 20 20 20 20 20 20 20 20 20 20 20 20 20 "sdf............."
-    - name: Limit the nvme info to *just* the line with the hypervsior device name
-      set_fact:
-        filtered_nvme_info_result: > 
-          {{ nvme_info_result.stdout | regex_search('\d+:(\d\d )+ "(/dev/)?(sd.)\.+"') }}
-
-    - name: debug filtered_nvme_info_result
-      debug:
-          var: filtered_nvme_info_result
-
-    - name: Extract the hypervisor device name from filtered_nvme_info_result
-      set_fact:
-        hypervisor_device: "{{ filtered_nvme_info_result[-1] | regex_search('sd.') }}"
-
-
-    - name: Stat nvme_device
-      ansible.builtin.stat:
-          path: "{{ nvme_device }}"
-      register: nvme_device_stat_result
-
-    - name: Debug nvme_device_stat_result
-      debug:
-        var: nvme_device_stat_result
-
-    - name: Make sure nvme device exists
-      assert:
-        that:
-          - nvme_device_stat_result.stat.exists
-
-    - name: Debug nvme_info_result
-      debug:
-        var: nvme_info_result
-
-    - name: Make sure nvme device has the expected hypervisor device name
-      # "{{ short_hyp_dev_name }}............."   / "sdh............."
-      # "{{ full_hyp_device_name    }}........"   / "/dev/sdh........"
-      assert:
-        that:
-          - >
-            '"{{ short_hyp_dev_name }}............."' in nvme_info_result.stdout or
-            '"{{ full_hyp_device_name    }}........"' in nvme_info_result.stdout
-
-    - name: Finally, set the os_device name to the nvme_device name
-      set_fact:
-        os_device: "{{ nvme_device }}"
-
-- name: os_device path 2 of 3  - Translate the hypervisor device name to the OS device name when the hypervisor device is a symlink (which it will be on aws-provided images)
+- name: os_device determination path 2 of 3 - Translate the hypervisor device name to the OS device name when the hypervisor device is a symlink (which it will be on aws-provided images)
   set_fact:
     os_device: "{{ hyp_dev_stat_result.stat.lnk_source }}"
   when: hyp_dev_stat_result.stat.exists
     and hyp_dev_stat_result.stat.islnk
 
-- name: os_device path 3 of 3  - Use the hypervisor device name directly as the OS device name when the hypervisor device is not a symlink
+- name: os_device determination path 3 of 3 - Use the hypervisor device name directly as the OS device name when the hypervisor device is not a symlink
   set_fact:
     os_device: "{{ hypervisor_device }}"
   when: hyp_dev_stat_result.stat.exists
@@ -148,7 +66,7 @@
     that:
       - os_dev_stat_result.stat.exists
 
-- name: Make sure we are not about to mess with root device
+- name: Make sure we are not about to mess with root os device
   assert:
     that:
       - os_device not in ["/dev/xvda", "/dev/nvme0n1", "/dev/sda", "/dev/sda1"]
