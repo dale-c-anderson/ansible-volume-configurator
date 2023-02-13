@@ -1,17 +1,36 @@
 ---
-- name: Format and mount additional ebs volumes on ec2 after the instance launched (NVMe version).
+- name: Format and mount additional ebs volumes on ec2 after the instance has launched.
   hosts: localhost
   connection: local
   gather_facts: true
   become: no
   tasks:
-    - name: Use default playbook unless we need to do otherwise.
-      set_fact:
-        use_nvme_playbook: false
+    - name: |
+        Use default playbook unless we need to do otherwise.
+        
+        This version is for well-supported instances (Amazon Linux, Ubuntu, etc). 
+        whose systems automatically map the hypervisor device name to the OS device name.
+        (eg they provide symlinks from /dev/sdf to /dev/xvdf or /dev/nvme1n1, etc.)
+        
+        If you use an image that does not perform the automatic mapping, and the instance 
+        supports NVMe, you will need to run the NVMe version of this playbook instead.
 
-    - name: Override playbook choice for things we know don't work with it.
       set_fact:
-        use_nvme_playbook: true
+        playbook_to_use: configure-volumes-by-ebs-metadata.yml
+
+    - name: |
+        Override playbook choice for things we know don't work with it.
+
+        Since AWS does not allow you to specify NVMe device names (in the block device mapping),
+        and since the block device driver in the OS can assign NVMe device names in a different
+        order than you specified for the volumes in the block device mapping, it's necessary 
+        to loops over the NVMe devices in the OS first, and then look up the ebs block 
+        device metatdata for each one. 
+    
+        Read more at https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvme-ebs-volumes.html
+
+      set_fact:
+        playbook_to_use: configure-volumes-by-nvme.yml
       when: ansible_distribution == "OracleLinux"
         and ansible_distribution_major_version == "7"  # @TODO: I'm sure we will need to add more OSes here, but this is a start.
 
@@ -21,25 +40,4 @@
     - name: Filter out root volume from block_device_mappings - creates "secondary_volumes" variable
       include_tasks: include/collect_ebs_block_device_mappings.yml
 
-    - name: |
-        This version is for well-supported instances (Amazon Linux, Ubuntu, etc). 
-        whose systems automatically map the hypervisor device name to the OS device name.
-        (eg they provide symlinks from /dev/sdf to /dev/xvdf or /dev/nvme1n1, etc.)
-      
-        If you use an image that does not perform the automatic mapping, and the instance 
-        supports NVMe, you will need to run the NVMe version of this playbook instead.        
-
-      include_tasks: include/configure-volumes-by-ebs-metadata.yml
-      when: not use_nvme_playbook
-
-    - name: |
-        Since AWS does not allow you to specify NVMe device names (in the block device mapping),
-        and since the block device driver in the OS can assign NVMe device names in a different
-        order than you specified for the volumes in the block device mapping, it's necessary 
-        to loops over the NVMe devices in the OS first, and then look up the ebs block 
-        device metatdata for each one. 
-    
-        Read more at https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvme-ebs-volumes.html
-
-      include_tasks: include/configure-volumes-by-nvme.yml
-      when: use_nvme_playbook
+    - include_tasks: include/{{ playbook_to_use }}
