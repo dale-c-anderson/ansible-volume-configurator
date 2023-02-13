@@ -1,0 +1,6 @@
+---
+    - name: Loop through ebs metadata and configure secondary volumes
+      include_tasks: ./configure_volume.yml
+      loop: "{{ secondary_volumes }}"
+      loop_control:
+        loop_var: volume

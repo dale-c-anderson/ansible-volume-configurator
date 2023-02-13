@@ -1,0 +1,66 @@
+---
+- name: Gather nvme vendor device info
+  shell: > 
+    /sbin/nvme id-ctrl -v "{{ nvme_device }}"
+  register: nvme_info_result
+  changed_when: false  # This is a read-only operation, so it should never be marked as changed.
+
+- name: debug nvme_info_result
+  debug:
+    var: nvme_info_result
+    verbosity: 1
+
+- name: Extract volume ID from nvme_info_result (shows up as serial number)
+  shell: echo "{{ nvme_info_result.stdout }}" | grep '^sn' | awk '{print $3}' | sed s'/vol/vol-/'
+  register: ebs_volume_id_result
+  changed_when: false  # This is a read-only operation, so it should never be marked as changed.
+
+- name: debug ebs_volume_id_result
+  debug:
+    var: ebs_volume_id_result
+    verbosity: 1
+
+- set_fact:
+    ebs_volume_id: "{{ ebs_volume_id_result.stdout }}"
+
+- debug:
+    var: ebs_volume_id
+
+- name: Extract the device name from NVME vendor info.
+  shell: echo "{{ nvme_info_result.stdout }}" | grep '^0000' | grep -o 'sd.'
+  register: ebs_external_block_device_name_result
+  changed_when: false  # This is a read-only operation, so it should never be marked as changed.
+
+- name: debug ebs_external_block_device_name_result
+  debug:
+    var: ebs_external_block_device_name_result
+    verbosity: 1
+
+- set_fact:
+    ebs_external_block_device_name: "/dev/{{ ebs_external_block_device_name_result.stdout }}"
+
+- debug:
+    var: ebs_external_block_device_name
+
+- debug:
+    var: secondary_volumes
+    verbosity: 1
+
+- name: Filter the correct ebs device metadata, so we can read on its tags
+  set_fact:
+    selected_volumes: "{{ secondary_volumes | selectattr('id', 'equalto', ebs_volume_id) | list }}"
+
+- set_fact:
+    volume: "{{ selected_volumes[0] }}"
+
+- name: Sanity check - make sure ebs hypervisor device name matches the one we found in the nvme vendor info
+  assert:
+    that:
+      - ebs_external_block_device_name == volume.attachment_set.device
+
+- name: Set os_device to nvme_device
+  set_fact:
+    os_device: "{{ nvme_device }}"
+
+- name: Now we can resume the regular configure_volume.yml playbook
+  include_tasks: configure_volume.yml

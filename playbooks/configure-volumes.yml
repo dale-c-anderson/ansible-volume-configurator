@@ -1,77 +1,41 @@
 ---
-- name: Format and mount additional ec2 volumes after the instance is first created
+- name: Format and mount additional ebs volumes on ec2 after the instance has launched.
   hosts: localhost
   connection: local
   gather_facts: true
   become: no
-  roles: []
   tasks:
-    - name: Find our own instance ID. There is a better way to do this, but it requires ansible more modern than 2.9
-      shell: /usr/bin/curl -s http://169.254.169.254/latest/meta-data/instance-id
-      register: instance_id_result
-      changed_when: False
-
-    - name: debug instance_id_result
-      debug:
-          var: instance_id_result
-
-    - set_fact:
-        instance_id: "{{ instance_id_result.stdout_lines[0]|trim() }}"
-
-    - assert:
-        that:
-          - (instance_id | length) == 19
-          - instance_id.startswith("i-")
-
-    - name: Gather the rest of the instance info
-      ec2_instance_info:
-        region: "{{ aws_region }}"
-        instance_ids:
-          - "{{ instance_id }}"
-      register: ec2_facts
-
-    - name: Get volume info
+    - name: |
+        Use default playbook unless we need to do otherwise.
+        
+        This version is for well-supported instances (Amazon Linux, Ubuntu, etc). 
+        whose systems automatically map the hypervisor device name to the OS device name.
+        (eg they provide symlinks from /dev/sdf to /dev/xvdf or /dev/nvme1n1, etc.)
+        
+        If you use an image that does not perform the automatic mapping, and the instance 
+        supports NVMe, you will need to run the NVMe version of this playbook instead.
       set_fact:
-        block_device_mappings: "{{ ec2_facts.instances[0].block_device_mappings }}"
+        playbook_to_use: configure-volumes-by-ebs-metadata.yml
 
-    - name: debug block_device_mappings
-      debug:
-          var: block_device_mappings
+    - name: |
+        Override playbook choice for things we know don't work with it.
 
-    - name: Get volume ID of root device
+        Since AWS does not allow you to specify NVMe device names (in the block device mapping),
+        and since the block device driver in the OS can assign NVMe device names in a different
+        order than you specified for the volumes in the block device mapping, it's necessary 
+        to loops over the NVMe devices in the OS first, and then look up the ebs block 
+        device metatdata for each one. 
+    
+        Read more at https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvme-ebs-volumes.html
       set_fact:
-        root_volume_id: "{{ block_device_mappings | selectattr('device_name', 'equalto', '/dev/xvda') | map(attribute='ebs.volume_id') | list | first }}"
+        playbook_to_use: configure-volumes-by-nvme.yml
+      when: ansible_distribution == "OracleLinux"
+        and ansible_distribution_major_version == "7"  # @TODO: I'm sure we will need to add more OSes here, but this is a start.
 
-    - name: Debug root_volume_id
-      debug:
-        var: root_volume_id
+    - name: Gather block_device_mapping metadata - creates "block_device_mappings" variable
+      include_tasks: ./include/collect_ebs_block_device_mappings.yml
 
-    - name: Collect volume info
-      ec2_vol_info:
-        region: "{{ aws_region }}"
-        filters:
-          attachment.instance-id: "{{ instance_id }}"
-      register: volume_info
+    - name: Filter out root volume from block_device_mappings - creates "secondary_volumes" variable
+      include_tasks: include/filter_ebdm_to_secondary_volumes.yml
 
-    - name: Debug volume_info
-      debug:
-          var: volume_info
-
-    - name: Exclude root volume from list of volumes to configure
-      set_fact:
-        secondary_volumes: "{{ volume_info.volumes | rejectattr('id', 'equalto', root_volume_id) | list }}"
-
-    - name: Debug secondary_volumes
-      debug:
-          var: secondary_volumes
-
-    - name: Configure secondary volumes
-      include_tasks: ./include/configure_volume.yml
-      loop: "{{ secondary_volumes }}"
-      loop_control:
-        loop_var: volume
-
-#    - include_tasks: ./include/configure_volume.yml
-#      loop: "{{ volumes }}"
-#      loop_control:
-#        loop_var: volume
+    - include_tasks: include/{{ playbook_to_use }}

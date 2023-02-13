@@ -1,0 +1,15 @@
+---
+    - name: Collect NVME devices list from the OS, excluding root OS device
+      shell:  /bin/lsblk -d -n -p -o NAME | grep nvme | grep -v nvme0n1 | grep -v xvda | grep -v sda
+      register: nvme_devices
+      changed_when: false  # This is a read-only operation, so it should never be marked as changed.
+
+    - name: Debug nvme_devices
+      debug:
+        var: nvme_devices
+
+    - name: Loop through NVMe devices, and match each to its corresponding ebs volume metadata
+      include_tasks: ./configure_nvme_volume.yml
+      loop: "{{ nvme_devices.stdout_lines }}"
+      loop_control:
+        loop_var: nvme_device
