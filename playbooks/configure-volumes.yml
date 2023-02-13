@@ -14,7 +14,6 @@
         
         If you use an image that does not perform the automatic mapping, and the instance 
         supports NVMe, you will need to run the NVMe version of this playbook instead.
-
       set_fact:
         playbook_to_use: configure-volumes-by-ebs-metadata.yml
 
@@ -28,7 +27,6 @@
         device metatdata for each one. 
     
         Read more at https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvme-ebs-volumes.html
-
       set_fact:
         playbook_to_use: configure-volumes-by-nvme.yml
       when: ansible_distribution == "OracleLinux"
@@ -38,6 +36,6 @@
       include_tasks: ./include/collect_ebs_block_device_mappings.yml
 
     - name: Filter out root volume from block_device_mappings - creates "secondary_volumes" variable
-      include_tasks: include/collect_ebs_block_device_mappings.yml
+      include_tasks: include/filter_ebdm_to_secondary_volumes.yml
 
     - include_tasks: include/{{ playbook_to_use }}
