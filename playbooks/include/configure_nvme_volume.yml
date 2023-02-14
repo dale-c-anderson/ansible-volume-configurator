@@ -1,4 +1,9 @@
 ---
+- name: Make sure nvme binary is present
+  ansible.builtin.package:
+      name: nvme-cli
+      state: present
+
 - name: Gather nvme vendor device info
   shell: > 
     /sbin/nvme id-ctrl -v "{{ nvme_device }}"

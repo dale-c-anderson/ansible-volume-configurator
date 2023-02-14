@@ -5,20 +5,28 @@
   gather_facts: true
   become: no
   tasks:
+    - name: Detect hypervisor so we can decide which playbook to use (nitro instances use NVMe)
+      shell: /usr/bin/curl -s http://169.254.169.254/latest/meta-data/system
+      args:
+        warn: false  # This task is simpler with curl than it is with ansible's built-in get_url module.
+      register: system_type_result
+    - set_fact:
+        hypervisor_name: "{{ system_type_result.stdout_lines[0] | trim() }}"
+
     - name: |
-        Use default playbook unless we need to do otherwise.
+        Loop through block devices using the Ec2 block device map metadata.
         
-        This version is for well-supported instances (Amazon Linux, Ubuntu, etc). 
-        whose systems automatically map the hypervisor device name to the OS device name.
-        (eg they provide symlinks from /dev/sdf to /dev/xvdf or /dev/nvme1n1, etc.)
-        
-        If you use an image that does not perform the automatic mapping, and the instance 
-        supports NVMe, you will need to run the NVMe version of this playbook instead.
+        This version is for non-NVMe systems (XVDxx or SDxx block devices), or NVMe systems which automatically
+        map the hypervisor device names to the OS device names. For instance, Amazon linux provides
+        symlinks from /dev/sdf to /dev/xvdf or /dev/nvme1n1, etc.
+
+        For NVMe systems which do not perform the automatic mapping, the NVMe playbook must be used.
+
       set_fact:
         playbook_to_use: configure-volumes-by-ebs-metadata.yml
 
     - name: |
-        Override playbook choice for things we know don't work with it.
+        Loop through block devices using the NVMe device list from the OS.
 
         Since AWS does not allow you to specify NVMe device names (in the block device mapping),
         and since the block device driver in the OS can assign NVMe device names in a different
@@ -27,10 +35,12 @@
         device metatdata for each one. 
     
         Read more at https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvme-ebs-volumes.html
+        For a list of instance types that use NVMe, see https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-types.html#ec2-nitro-instances
+
       set_fact:
         playbook_to_use: configure-volumes-by-nvme.yml
-      when: ansible_distribution == "OracleLinux"
-        and ansible_distribution_major_version == "7"  # @TODO: I'm sure we will need to add more OSes here, but this is a start.
+      when: hypervisor_name == 'nitro'
+          and ansible_distribution not in ["Amazon"]
 
     - name: Gather block_device_mapping metadata - creates "block_device_mappings" variable
       include_tasks: ./include/collect_ebs_block_device_mappings.yml
