@@ -5,13 +5,13 @@
   gather_facts: true
   become: no
   tasks:
-    - name: Detect hypervisor (nitro uses NVMe) so we can decied which playbook to use.
-      # shell: /usr/bin/curl -s http://169.254.169.254/latest/meta-data/system
-      get_url:
-        url: http://169.254.169.254/latest/meta-data/system
+    - name: Detect hypervisor so we can decide which playbook to use (nitro instances use NVMe)
+      shell: /usr/bin/curl -s http://169.254.169.254/latest/meta-data/system
+      args:
+        warn: false  # This task is simpler with curl than it is with ansible's built-in get_url module.
       register: system_type_result
     - set_fact:
-        hypervisor_name: "{{ system_type_result.content|trim() }}"  # Should be xen or nitro
+        hypervisor_name: "{{ system_type_result.stdout_lines[0] | trim() }}"
 
     - name: |
         Loop through block devices using the Ec2 block device map metadata.
