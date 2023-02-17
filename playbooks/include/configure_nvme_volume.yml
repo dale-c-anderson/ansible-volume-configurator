@@ -1,8 +1,10 @@
 ---
-- name: Make sure nvme binary is present
-  ansible.builtin.package:
-      name: nvme-cli
-      state: present
+- name: Make sure nvme binary is present. This task is best-effort only. If this task generates an error, you'll need to install nvme-cli manually.
+  package:
+    name: nvme-cli
+    state: present
+  when: ansible_os_family == 'RedHat'
+  ignore_errors: true
 
 - name: Gather nvme vendor device info
   shell: > 
